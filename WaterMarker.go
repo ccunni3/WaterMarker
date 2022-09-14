@@ -170,6 +170,7 @@ func openImage(fname string, ftype string) image.Image {
 	if err != nil {
 		log.Fatalf("failed to open: %s", err)
 	}
+	defer inputfile.Close()
 
 	var srcimage image.Image
 
@@ -190,6 +191,5 @@ func openImage(fname string, ftype string) image.Image {
 	if err != nil {
 		log.Fatalf("failed to decode: %s", err)
 	}
-	defer inputfile.Close()
 	return srcimage
 }
