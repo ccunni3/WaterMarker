@@ -139,43 +139,38 @@ func getFiles(dir string) []os.FileInfo {
 func saveImage(img image.Image, pname, fname string) {
 	fpath := path.Join(pname, fname)
 	outputFile, err := os.Create(fpath)
-
 	if err != nil {
-		log.Fatalf("failed to create: %s", err)
+		log.Fatalf("failed to create file: %s", err)
 	}
-	var opt jpeg.Options
-	opt.Quality = 95
-
-	jpeg.Encode(outputFile, img, &opt)
 	defer outputFile.Close()
-	return nil
+
+	opt := jpeg.Options{
+		Quality: 95,
+	}
+	if err := jpeg.Encode(outputFile, img, &opt); err != nil {
+		log.Fatalf("failed to encode watermarked image: %v", err)
+	}
 }
 
 func openImage(fname string, ftype string) image.Image {
 	inputfile, err := os.Open(fname)
 	if err != nil {
-		log.Fatalf("failed to open: %s", err)
+		log.Fatalf("failed to open file: %s", err)
 	}
 	defer inputfile.Close()
 
 	var srcimage image.Image
-
-	if ftype == "jpeg" {
-		srcimage, err = jpeg.Decode(inputfile)
-		if err != nil {
-			log.Fatalf("failed to decode: %s", err)
+	switch ftype {
+	case "jpeg":
+		if srcimage, err = jpeg.Decode(inputfile); err != nil {
+			log.Fatalf("failed to decode jpeg image: %s", err)
 		}
-		defer inputfile.Close()
-	} else if ftype == "png" {
-		srcimage, err = png.Decode(inputfile)
-		if err != nil {
-			log.Fatalf("failed to decode: %s", err)
+	case "png":
+		if srcimage, err = png.Decode(inputfile); err != nil {
+			log.Fatalf("failed to decode png: %s", err)
 		}
-		defer inputfile.Close()
-	}
-
-	if err != nil {
-		log.Fatalf("failed to decode: %s", err)
+	default:
+		log.Fatalf("file type: %q is not supported", ftype)
 	}
 	return srcimage
 }
