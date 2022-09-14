@@ -20,7 +20,18 @@ import (
 	"github.com/nfnt/resize"
 )
 
+var (
+	paramOpacity   *int     = flag.Int("opacity", 70, "Watermark opacity between 0 and 100")
+	paramLocation  *string  = flag.String("location", "right", "Location of watermark [left, right]")
+	paramScale     *float64 = flag.Float64("scale", 0.2, "Specify the size of the watermark as a portion of the image (between 0 and 1)")
+	paramWatermark *string  = flag.String("watermark", "watermark.png", "Name of PNG image to be used as watermark")
+	paramSourceDir *string  = flag.String("source", "photos", "Source directory (location to find un-watermarked photos)")
+	paramTargetDir *string  = flag.String("target", "watermarked", "Target directory (location to put watermarked photos")
+	paramForce     *bool    = flag.Bool("force", false, "Force overwrite of target directory if it already exists")
+)
+
 func main() {
+	flag.Parse()
 	fmt.Println("**************************************************************************")
 	fmt.Println("*                                                                        *")
 	fmt.Println("*      WaterMarker v1.0 - Written by Tjeerd Bakker (ICheered) in Go      *")
@@ -30,38 +41,34 @@ func main() {
 	fmt.Println("For help: run the program from command line with the -h flag")
 	fmt.Println("Having issues? Please let me know at Tjeerd992@gmail.com")
 	fmt.Println("")
-	watermarkOpacity, watermarkLocation, watermarkScale, watermarkFile, sourceDir, targetDir, force := getParameters()
 
 	fmt.Println("Using following parameters:")
-	fmt.Printf("- Opacity:          %d\n", watermarkOpacity)
-	fmt.Printf("- Location:         %s\n", watermarkLocation)
-	fmt.Printf("- Scale:            %1.1f\n", watermarkScale)
-	fmt.Printf("- Watermark:        %s\n", watermarkFile)
-	fmt.Printf("- Source directory: %s\n", sourceDir)
-	fmt.Printf("- Target directory: %s\n", targetDir)
-	fmt.Println("")
+	fmt.Printf("- Opacity:          %d\n", *paramOpacity)
+	fmt.Printf("- Location:         %s\n", *paramLocation)
+	fmt.Printf("- Scale:            %1.1f\n", *paramScale)
+	fmt.Printf("- Watermark:        %s\n", *paramWatermark)
+	fmt.Printf("- Source directory: %s\n", *paramSourceDir)
+	fmt.Printf("- Target directory: %s\n", *paramTargetDir)
 
-	if _, err := os.Stat(watermarkFile); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(*paramWatermark); errors.Is(err, os.ErrNotExist) {
 		// Watermark file does not exist
-		fmt.Printf("ERROR: Watermark file '%s' does not exist in this directory\n", watermarkFile)
-		os.Exit(1)
+		log.Fatalf("ERROR: Watermark file '%s' does not exist in this directory\n", *paramWatermark)
 	}
 
-	if !strings.HasSuffix(watermarkFile, ".png") {
-		fmt.Printf("ERROR: Watermark file '%s' is not a PNG file\n", watermarkFile)
-		os.Exit(1)
+	if !strings.HasSuffix(*paramWatermark, ".png") {
+		// Watermark is not a PNG
+		log.Fatalf("ERROR: Watermark file '%s' is not a PNG file\n", *paramWatermark)
 	}
 
-	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
+	if _, err := os.Stat(*paramSourceDir); os.IsNotExist(err) {
 		// Source folder does not exist
-		fmt.Printf("ERROR: Source folder (folder containing images) '%s' does not exist in this directory\n", sourceDir)
-		os.Exit(1)
+		log.Fatalf("ERROR: Source folder (folder containing images) '%s' does not exist in this directory\n", *paramSourceDir)
 	}
 
-	if _, err := os.Stat(targetDir); err == nil {
+	if _, err := os.Stat(*paramTargetDir); err == nil {
 		// Target dir already exists
-		fmt.Printf("WARNING: Target folder '%s' already exists in this directory. \n", targetDir)
-		if force {
+		fmt.Printf("WARNING: Target folder '%s' already exists in this directory. \n", *paramTargetDir)
+		if *paramForce {
 			fmt.Println("         Using --force, so will overwrite existing files")
 		} else {
 			fmt.Println("         Use --force to overwrite existing files")
@@ -69,13 +76,13 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		os.Mkdir(targetDir, 0755)
+		os.Mkdir(*paramTargetDir, 0755)
 	}
 	fmt.Print("\n--------------------------------------\n")
 
-	watermark := openImage(watermarkFile, "png")
-	mask := image.NewUniform(color.Alpha{uint8(watermarkOpacity * 255)})
-	files := getFiles(sourceDir)
+	watermark := openImage(*paramWatermark, "png")
+	mask := image.NewUniform(color.Alpha{uint8(*paramOpacity * 255)})
+	files := getFiles(*paramSourceDir)
 
 	fmt.Printf("Starting: Processing %d files\n\n", len(files))
 
@@ -109,7 +116,7 @@ func main() {
 			draw.DrawMask(canvas, imgSize.Add(watermarkOffset), scaledWatermark, image.Point{0, 0}, mask, image.Point{0, 0}, draw.Over)
 
 			saveImage(canvas, targetDir, file.Name())
-		}(file, watermark, mask, watermarkLocation, watermarkScale, sourceDir, targetDir)
+		}(file, watermark, mask, *paramWatermark, *paramScale, *paramSourceDir, *paramTargetDir)
 	}
 	wg.Wait()
 	elapsed := time.Since(start)
@@ -129,28 +136,7 @@ func getFiles(dir string) []os.FileInfo {
 	return files
 }
 
-func getParameters() (int, string, float64, string, string, string, bool) {
-	paramOpacity := flag.Int("opacity", 70, "Watermark opacity between 0 and 100")
-	paramLocation := flag.String("location", "right", "Location of watermark [left, right]")
-	paramScale := flag.Float64("scale", 0.2, "Specify the size of the watermark as a portion of the image (between 0 and 1)")
-	paramWatermark := flag.String("watermark", "watermark.png", "Name of PNG image to be used as watermark")
-	paramSourceDir := flag.String("source", "photos", "Source directory (location to find un-watermarked photos)")
-	paramTargetDir := flag.String("target", "watermarked", "Target directory (location to put watermarked photos")
-	paramForce := flag.Bool("force", false, "Force overwrite of target directory if it already exists")
-
-	flag.Parse()
-	opacity := *paramOpacity
-	location := *paramLocation
-	scale := *paramScale
-	watermark := *paramWatermark
-	sourceDir := *paramSourceDir
-	targetDir := *paramTargetDir
-	force := *paramForce
-
-	return opacity, location, scale, watermark, sourceDir, targetDir, force
-}
-
-func saveImage(img image.Image, pname, fname string) error {
+func saveImage(img image.Image, pname, fname string) {
 	fpath := path.Join(pname, fname)
 	outputFile, err := os.Create(fpath)
 
